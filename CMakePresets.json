@@ -1,0 +1,49 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "fast",
+      "displayName": "Local Release build",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build-fast",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "COMMON_LIB_F4VR_PATH": "$env{COMMON_LIB_F4VR_PATH}",
+        "VCPKG_TARGET_TRIPLET": "x64-windows-static",
+        "CMAKE_POLICY_VERSION_MINIMUM": "3.5",
+        "YAML_CPP_BUILD_TESTS": false,
+        "YAML_CPP_BUILD_TOOLS": false
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "fast",
+      "configurePreset": "fast",
+      "configuration": "Release",
+      "targets": [
+        "GLXRM_SCOURGE",
+        "log_path_tests",
+        "startup_requirements_tests"
+      ],
+      "nativeToolOptions": [
+        "/m:1",
+        "/p:CL_MPCount=2"
+      ]
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "fast",
+      "configurePreset": "fast",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 4
+      }
+    }
+  ]
+}

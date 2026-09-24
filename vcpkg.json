@@ -1,0 +1,18 @@
+{
+  "name": "scourge-vr",
+  "version-string": "1.0.0",
+  "description": "SCOURGE ported to Fallout 4 VR",
+  "dependencies": [
+    "boost-stl-interfaces",
+    "fmt",
+    "rapidcsv",
+    "rsm-mmio",
+    "spdlog",
+    "xbyak"
+  ],
+  "overrides": [
+    { "name": "fmt", "version": "10.2.1" },
+    { "name": "spdlog", "version": "1.13.0" }
+  ],
+  "builtin-baseline": "c82f74667287d3dc386bce81e44964370c91a289"
+}

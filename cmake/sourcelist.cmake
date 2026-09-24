@@ -1,0 +1,15 @@
+set(SOURCES
+	include/StartupRequirements.h
+	src/StartupRequirements.cpp
+	include/LoadEditorIDs.h
+	include/FormLookup.h
+	include/LogPath.h
+	include/PapyrusManager.h
+	include/RNJesus.h
+	include/SCOURGE.h
+	include/SimpleIni.h
+	include/YamlParser.h
+	src/PCH.h
+	src/main.cpp
+	src/PapyrusManager.cpp
+)
