@@ -26,10 +26,6 @@
         "GLXRM_SCOURGE",
         "log_path_tests",
         "startup_requirements_tests"
-      ],
-      "nativeToolOptions": [
-        "/m:1",
-        "/p:CL_MPCount=2"
       ]
     }
   ],
