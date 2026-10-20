@@ -22,11 +22,7 @@
       "name": "fast",
       "configurePreset": "fast",
       "configuration": "Release",
-      "targets": [
-        "GLXRM_SCOURGE",
-        "log_path_tests",
-        "startup_requirements_tests"
-      ]
+      "targets": ["GLXRM_SCOURGE"]
     }
   ],
   "testPresets": [
@@ -36,9 +32,6 @@
       "configuration": "Release",
       "output": {
         "outputOnFailure": true
-      },
-      "execution": {
-        "jobs": 4
       }
     }
   ]
