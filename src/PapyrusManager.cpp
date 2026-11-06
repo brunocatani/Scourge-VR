@@ -23,8 +23,6 @@ namespace Utils
 		return a_actor->GetNPC();
 	}
 
-	bool ActorMatchesKeyword(RE::Actor* a_actor, RE::TESNPC* a_baseNPC, RE::BGSKeyword* a_keyword);
-
 	bool CanRecalculateActor(RE::Actor* a_actor, bool a_skipAlreadyTracked)
 	{
 		if (!a_actor) {
@@ -35,12 +33,11 @@ namespace Utils
 			return false;
 		}
 
-		auto* baseNPC = GetBaseNPC(a_actor);
-		if (!baseNPC) {
+		if (!GetBaseNPC(a_actor)) {
 			return false;
 		}
 
-		if (ActorMatchesKeyword(a_actor, baseNPC, pluginData.kw_All)) {
+		if (a_actor->HasKeyword(pluginData.kw_All)) {
 			return false;
 		}
 
@@ -51,47 +48,6 @@ namespace Utils
 		return true;
 	}
 
-	// The actor's own race is the only authority, as in the original mod. A leveled actor's base record reads
-	// SynthGen2RaceValentine at runtime: testing it put every such actor through that race's filter as well, and the
-	// last filter wins.
-	bool ActorMatchesRace(RE::Actor* a_actor, const std::unordered_set<RE::TESRace*>& a_races)
-	{
-		if (a_races.empty()) {
-			return true;
-		}
-
-		return a_actor && a_actor->race && a_races.find(a_actor->race) != a_races.end();
-	}
-
-	bool ActorMatchesFaction(RE::Actor* a_actor, RE::TESNPC* a_baseNPC, RE::TESFaction* a_faction)
-	{
-		if (!a_faction) {
-			return false;
-		}
-
-		return (a_actor && a_actor->IsInFaction(a_faction)) || (a_baseNPC && a_baseNPC->IsInFaction(a_faction));
-	}
-
-	bool ActorMatchesKeyword(RE::Actor* a_actor, RE::TESNPC* a_baseNPC, RE::BGSKeyword* a_keyword)
-	{
-		if (!a_keyword) {
-			return false;
-		}
-
-		if (a_actor && a_actor->HasKeyword(a_keyword)) {
-			return true;
-		}
-
-		if (a_baseNPC && a_baseNPC->HasKeyword(a_keyword)) {
-			return true;
-		}
-
-		if (a_actor && a_actor->race && a_actor->race->HasKeyword(a_keyword)) {
-			return true;
-		}
-
-		return false;
-	}
 }
 
 namespace Papyrus
@@ -124,15 +80,17 @@ namespace Papyrus
 			}
 
 			if (filter.raceList.empty() == false) {
-				// if the NPC's Race isn't listed we skip this filter
-				if (!Utils::ActorMatchesRace(a_actor, filter.raceList)) {
+				// if the NPC's Race isn't listed we skip this filter. The actor's own race is the only authority:
+				// a leveled actor's base record reads SynthGen2RaceValentine at runtime, so testing it put every
+				// such actor through that race's filter as well, and the last filter wins.
+				if (filter.raceList.find(a_actor->race) == filter.raceList.end()) {
 					continue;
 				}
 			}
 
 			if (filter.factionList.empty() == false) {
 				for (RE::TESFaction* faction : filter.factionList) {
-					if (!Utils::ActorMatchesFaction(a_actor, baseNPC, faction)) {
+					if (!a_actor->IsInFaction(faction)) {
 						skipFilter = true;
 						break;
 					}
@@ -144,7 +102,7 @@ namespace Papyrus
 
 			if (filter.keywordList.empty() == false) {
 				for (RE::BGSKeyword* keyword : filter.keywordList) {
-					if (!Utils::ActorMatchesKeyword(a_actor, baseNPC, keyword)) {
+					if (!a_actor->HasKeyword(keyword)) {
 						skipFilter = true;
 						break;
 					}
@@ -216,14 +174,9 @@ namespace Papyrus
 
 	void RecalculateStats(RE::Actor* a_actor, std::array<std::pair<ValueData, float>, AV_COUNT>& a_statArray, int& a_trackerValue)
 	{
-		auto* baseNPC = Utils::GetBaseNPC(a_actor);
-		if (!baseNPC) {
-			return;
-		}
-
 		if (!pluginData.pluginRecords.empty() && a_statArray[0].first.enableGlobal.first && pluginData.globalStatMults.size() > 0 && pluginData.globalStatMults[0]) {
 			if (a_statArray[0].first.enableGlobal.first->GetValue() == 1.0f) {
-				if (!Utils::ActorMatchesKeyword(a_actor, baseNPC, pluginData.pluginRecords[0].exclusionKeyword)) {
+				if (!a_actor->HasKeyword(pluginData.pluginRecords[0].exclusionKeyword)) {
 					if (a_statArray[0].first.minGlobal.first && a_statArray[0].first.maxGlobal.first) {
 						float bias = 0.5f;
 
@@ -249,7 +202,7 @@ namespace Papyrus
 				continue;
 			}
 			// check if the NPC has the exclusion keyword
-			if (Utils::ActorMatchesKeyword(a_actor, baseNPC, pluginData.pluginRecords[i].exclusionKeyword)) {
+			if (a_actor->HasKeyword(pluginData.pluginRecords[i].exclusionKeyword)) {
 				continue;
 			}
 			// make sure that both the _Min and _Max Globals exist
@@ -334,7 +287,7 @@ namespace Papyrus
 			});
 		}
 
-		void RunGlobalRecalculation(bool a_skipAlreadyTracked)
+		void RunGlobalRecalculation()
 		{
 			const auto processLists = RE::ProcessLists::GetSingleton();
 
@@ -363,25 +316,13 @@ namespace Papyrus
 					}
 
 					++seenCount;
-					if (RunActorRecalculation(currentActor, a_skipAlreadyTracked)) {
+					if (RunActorRecalculation(currentActor, false)) {
 						++recalculatedCount;
 					}
 				}
 			}
 
 			logger::warn("SCOURGE global recalculation scanned {} actors and recalculated {}", seenCount, recalculatedCount);		}
-	}
-
-	void QueueGlobalRecalculation(bool a_skipAlreadyTracked)
-	{
-		if (!F4SE::GetTaskInterface()) {
-			logger::error("Unable to queue SCOURGE global recalculation: task interface unavailable");
-			return;
-		}
-
-		F4SE::GetTaskInterface()->AddTask([a_skipAlreadyTracked]() {
-			RunGlobalRecalculation(a_skipAlreadyTracked);
-		});
 	}
 
 	void SCOURGE(std::monostate, RE::Actor* a_actor)
@@ -450,7 +391,14 @@ namespace Papyrus
 
 	void SCOURGE_Recalculate_Global(std::monostate)
 	{
-		QueueGlobalRecalculation(false);
+		if (!F4SE::GetTaskInterface()) {
+			logger::error("Unable to queue SCOURGE global recalculation: task interface unavailable");
+			return;
+		}
+
+		F4SE::GetTaskInterface()->AddTask([]() {
+			RunGlobalRecalculation();
+		});
 	}
 
 	bool BindFunctions(RE::BSScript::IVirtualMachine* a_vm)

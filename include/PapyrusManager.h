@@ -125,6 +125,5 @@ namespace PapyrusCaller
 
 namespace Papyrus
 {
-	void QueueGlobalRecalculation(bool a_skipAlreadyTracked);
 	bool BindFunctions(RE::BSScript::IVirtualMachine*);
 }

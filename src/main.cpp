@@ -224,11 +224,6 @@ extern "C" DLLEXPORT bool F4SEAPI F4SEPlugin_Load(const F4SE::LoadInterface* a_f
 							logger::warn("Unable to distribute SCOURGE_SPEL! The plugin will not work...");
 						}
 					}
-				} else if (msg->type == F4SE::MessagingInterface::kPostLoadGame || msg->type == F4SE::MessagingInterface::kNewGame) {
-					if (pluginData.loadedCorrectly && !configData.filters.empty()) {
-						logger::warn("Save/new game loaded; queueing SCOURGE recalculation for untracked loaded actors");
-						Papyrus::QueueGlobalRecalculation(true);
-					}
 				}
 			} catch (const std::exception& error) {
 				logger::critical("SCOURGE message processing failed: {}", error.what());
