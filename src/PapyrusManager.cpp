@@ -51,21 +51,16 @@ namespace Utils
 		return true;
 	}
 
-	bool ActorMatchesRace(RE::Actor* a_actor, RE::TESNPC* a_baseNPC, const std::unordered_set<RE::TESRace*>& a_races)
+	// The actor's own race is the only authority, as in the original mod. A leveled actor's base record reads
+	// SynthGen2RaceValentine at runtime: testing it put every such actor through that race's filter as well, and the
+	// last filter wins.
+	bool ActorMatchesRace(RE::Actor* a_actor, const std::unordered_set<RE::TESRace*>& a_races)
 	{
 		if (a_races.empty()) {
 			return true;
 		}
 
-		if (a_actor && a_actor->race && a_races.find(a_actor->race) != a_races.end()) {
-			return true;
-		}
-
-		if (a_baseNPC && a_baseNPC->GetFormRace() && a_races.find(a_baseNPC->GetFormRace()) != a_races.end()) {
-			return true;
-		}
-
-		return false;
+		return a_actor && a_actor->race && a_races.find(a_actor->race) != a_races.end();
 	}
 
 	bool ActorMatchesFaction(RE::Actor* a_actor, RE::TESNPC* a_baseNPC, RE::TESFaction* a_faction)
@@ -91,7 +86,7 @@ namespace Utils
 			return true;
 		}
 
-		if (a_baseNPC && a_baseNPC->GetFormRace() && a_baseNPC->GetFormRace()->HasKeyword(a_keyword)) {
+		if (a_actor && a_actor->race && a_actor->race->HasKeyword(a_keyword)) {
 			return true;
 		}
 
@@ -130,7 +125,7 @@ namespace Papyrus
 
 			if (filter.raceList.empty() == false) {
 				// if the NPC's Race isn't listed we skip this filter
-				if (!Utils::ActorMatchesRace(a_actor, baseNPC, filter.raceList)) {
+				if (!Utils::ActorMatchesRace(a_actor, filter.raceList)) {
 					continue;
 				}
 			}
@@ -276,7 +271,12 @@ namespace Papyrus
 			} else {
 				// armor resistances are baked into BaseValue so we need to take away the value that's inside the NPC record
 				// also can't use SetValue :todd:
-				float armorValue = a_actor->GetBaseActorValue(*pluginData.pluginRecords[i].actorValue) - baseNPC->GetActorValue(*pluginData.pluginRecords[i].actorValue);
+				// The record is the actor's own, as in the original mod, not the leveled base that GetBaseNPC returns.
+				auto* actorNPC = a_actor->GetNPC();
+				if (!actorNPC) {
+					continue;
+				}
+				float armorValue = a_actor->GetBaseActorValue(*pluginData.pluginRecords[i].actorValue) - actorNPC->GetActorValue(*pluginData.pluginRecords[i].actorValue);
 
 				float trashValue = a_actor->GetActorValue(*pluginData.pluginRecords[i].actorValue) - armorValue;
 
@@ -369,8 +369,7 @@ namespace Papyrus
 				}
 			}
 
-			logger::warn("SCOURGE global recalculation scanned {} actors and recalculated {}", seenCount, recalculatedCount);
-		}
+			logger::warn("SCOURGE global recalculation scanned {} actors and recalculated {}", seenCount, recalculatedCount);		}
 	}
 
 	void QueueGlobalRecalculation(bool a_skipAlreadyTracked)
