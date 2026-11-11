@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.0
 
 First release of the Fallout 4 VR port of SCOURGE by GELUXRUM. It replaces the
 original mod's `GLXRM_SCOURGE.dll`; the original mod's plugins, scripts, YAML
