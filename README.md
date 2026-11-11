@@ -70,10 +70,11 @@ Install Visual Studio 2022 with Desktop development with C++, a Windows SDK, CMa
 ```powershell
 cmake --preset fast
 cmake --build --preset fast
-ctest --preset fast
+cmake --build build-fast --config Release --target build_tests
+ctest --test-dir build-fast -C Release --output-on-failure
 ```
 
-The preset builds Release with compiler concurrency capped at two processes. The DLL is written to `build-fast/Release/GLXRM_SCOURGE.dll`. Put machine-specific settings and optional deployment paths in an ignored `CMakeUserPresets.json`.
+The preset builds Release; tests stay out of the default build. The DLL is written to `build-fast/Release/GLXRM_SCOURGE.dll`. Put machine-specific settings and optional deployment paths in an ignored `CMakeUserPresets.json`.
 
 ## Credits and permission
 
