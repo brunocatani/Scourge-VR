@@ -14,6 +14,9 @@ filters and MCM files stay required.
   through a synth filter; keyword and faction tests work as in the original.
 - Recalculation runs through the original mod's spell effect and its manual
   `SCOURGE_Recalculate_Global`, as in the original, with no extra sweep at load.
+- The spell is given to NPC records again before every save load. Returning to the main
+  menu, after a death or by quitting, takes it off placed NPCs, so without this they were no
+  longer recalculated after the first reload.
 - The dependency checks are always on: a missing or rejected Scaling Flag
   Remover, or RobCo Patcher's save-load stat recalculation turned on, shows a
   warning and closes the game when the warning is dismissed.

@@ -66,28 +66,6 @@ namespace
 		logger::warn("Distributed SCOURGE_SPEL to {} NPC records ({})", added, a_when);
 	}
 
-	// Diagnostic for the reload revert: which records lack the spell once the save is read.
-	void CountMissingSpell(RE::TESDataHandler* a_dataHandler)
-	{
-		const auto* spell = pluginData.spellForm ? pluginData.spellForm->As<RE::SpellItem>() : nullptr;
-		if (!spell) {
-			return;
-		}
-		std::uint32_t missing{ 0 };
-		std::string sample;
-		for (auto currentNPC : a_dataHandler->GetFormArray<RE::TESNPC>()) {
-			if (!currentNPC || currentNPC->IsPlayer()) {
-				continue;
-			}
-			if (!currentNPC->spellData || !currentNPC->spellData->GetIndex(spell)) {
-				if (++missing <= 12) {
-					sample += fmt::format(" {:08X}", currentNPC->formID);
-				}
-			}
-		}
-		logger::warn("After the save load {} NPC records lack SCOURGE_SPEL:{}", missing, sample);
-	}
-
 	bool IsPluginLoaded(const char* registeredName, const wchar_t* dllName)
 	{
 		const auto* messaging = F4SE::GetMessagingInterface();
@@ -225,20 +203,13 @@ extern "C" DLLEXPORT bool F4SEAPI F4SEPlugin_Load(const F4SE::LoadInterface* a_f
 				if (msg->type == F4SE::MessagingInterface::kPreLoadGame) {
 					// RobCo rereads this option on each save load; check before it runs.
 					VerifyRequirements();
-					// A save loaded after the game returned to the main menu (a death reload, or quitting
-					// to the menu) finds NPC records reverted to their plugin data, measured on the bench:
-					// placed NPCs such as Piper lost the spell. Game data is ready only once per process.
+					// Returning to the main menu (a death reload, or quitting to the menu) reverts NPC
+					// records to their plugin data before the next save is read: measured on the bench,
+					// 274 records, placed NPCs such as Piper among them, had lost the spell here. Game
+					// data is ready only once per process, so the spell is distributed before each load.
 					if (pluginData.loadedCorrectly && pluginData.spellForm) {
 						if (auto dataHandler = RE::TESDataHandler::GetSingleton(); dataHandler) {
 							DistributeSpell(dataHandler, "before save load");
-						}
-					}
-					return;
-				}
-				if (msg->type == F4SE::MessagingInterface::kPostLoadGame) {
-					if (pluginData.loadedCorrectly && pluginData.spellForm) {
-						if (auto dataHandler = RE::TESDataHandler::GetSingleton(); dataHandler) {
-							CountMissingSpell(dataHandler);
 						}
 					}
 					return;
