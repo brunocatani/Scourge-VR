@@ -38,6 +38,56 @@ namespace
 
 	void IgnoreDependencyMessages(F4SE::MessagingInterface::Message*) {}
 
+	bool IsExcludedNPC(const RE::TESNPC* a_npc, std::uint32_t a_workbenchBot, std::uint32_t a_levelledWorkbenchBot)
+	{
+		// the player, MQ101 Nate and Nora so that they don't become midgets, and the automatron
+		// workbench robots
+		return a_npc->IsPlayer() || a_npc->formID == 687412 || a_npc->formID == 687413 ||
+			a_npc->formID == a_levelledWorkbenchBot || a_npc->formID == a_workbenchBot;
+	}
+
+	// TESSpellList::AddSpell (Fallout4VR.exe 0x14016E480 -> 0x14016DEE0) skips a spell already in the
+	// list and returns false then, so this counts only the records that lacked it.
+	void DistributeSpell(RE::TESDataHandler* a_dataHandler, std::string_view a_when)
+	{
+		std::uint32_t workbenchBot{ 0 };
+		std::uint32_t levelledWorkbenchBot{ 0 };
+		if (a_dataHandler->LookupModByName("DLCRobot.esm")) {
+			workbenchBot = FormLookup::LookupFormID(a_dataHandler, 69753, "DLCRobot.esm");
+			levelledWorkbenchBot = FormLookup::LookupFormID(a_dataHandler, 7917, "DLCRobot.esm");
+		}
+
+		std::uint32_t added{ 0 };
+		for (auto currentNPC : a_dataHandler->GetFormArray<RE::TESNPC>()) {
+			if (currentNPC && !IsExcludedNPC(currentNPC, workbenchBot, levelledWorkbenchBot) && currentNPC->AddSpell(pluginData.spellForm)) {
+				++added;
+			}
+		}
+		logger::warn("Distributed SCOURGE_SPEL to {} NPC records ({})", added, a_when);
+	}
+
+	// Diagnostic for the reload revert: which records lack the spell once the save is read.
+	void CountMissingSpell(RE::TESDataHandler* a_dataHandler)
+	{
+		const auto* spell = pluginData.spellForm ? pluginData.spellForm->As<RE::SpellItem>() : nullptr;
+		if (!spell) {
+			return;
+		}
+		std::uint32_t missing{ 0 };
+		std::string sample;
+		for (auto currentNPC : a_dataHandler->GetFormArray<RE::TESNPC>()) {
+			if (!currentNPC || currentNPC->IsPlayer()) {
+				continue;
+			}
+			if (!currentNPC->spellData || !currentNPC->spellData->GetIndex(spell)) {
+				if (++missing <= 12) {
+					sample += fmt::format(" {:08X}", currentNPC->formID);
+				}
+			}
+		}
+		logger::warn("After the save load {} NPC records lack SCOURGE_SPEL:{}", missing, sample);
+	}
+
 	bool IsPluginLoaded(const char* registeredName, const wchar_t* dllName)
 	{
 		const auto* messaging = F4SE::GetMessagingInterface();
@@ -175,6 +225,22 @@ extern "C" DLLEXPORT bool F4SEAPI F4SEPlugin_Load(const F4SE::LoadInterface* a_f
 				if (msg->type == F4SE::MessagingInterface::kPreLoadGame) {
 					// RobCo rereads this option on each save load; check before it runs.
 					VerifyRequirements();
+					// A save loaded after the game returned to the main menu (a death reload, or quitting
+					// to the menu) finds NPC records reverted to their plugin data, measured on the bench:
+					// placed NPCs such as Piper lost the spell. Game data is ready only once per process.
+					if (pluginData.loadedCorrectly && pluginData.spellForm) {
+						if (auto dataHandler = RE::TESDataHandler::GetSingleton(); dataHandler) {
+							DistributeSpell(dataHandler, "before save load");
+						}
+					}
+					return;
+				}
+				if (msg->type == F4SE::MessagingInterface::kPostLoadGame) {
+					if (pluginData.loadedCorrectly && pluginData.spellForm) {
+						if (auto dataHandler = RE::TESDataHandler::GetSingleton(); dataHandler) {
+							CountMissingSpell(dataHandler);
+						}
+					}
 					return;
 				}
 				if (msg->type == F4SE::MessagingInterface::kGameDataReady) {
@@ -192,34 +258,7 @@ extern "C" DLLEXPORT bool F4SEAPI F4SEPlugin_Load(const F4SE::LoadInterface* a_f
 						configData.LoadConfigs();
 
 						if (auto dataHandler = RE::TESDataHandler::GetSingleton(); dataHandler) {
-							std::uint32_t DLC01CompWorkbenchBot{ 0 };
-							std::uint32_t DLC01LvlCompWorkbenchBot{ 0 };
-							// exclude automatron robot companion
-							if (dataHandler->LookupModByName("DLCRobot.esm")) {
-								DLC01CompWorkbenchBot = FormLookup::LookupFormID(dataHandler, 69753, "DLCRobot.esm");
-								DLC01LvlCompWorkbenchBot = FormLookup::LookupFormID(dataHandler, 7917, "DLCRobot.esm");
-							}
-
-							std::uint32_t spellDistributionCount{ 0 };
-							for (auto currentNPC : dataHandler->GetFormArray<RE::TESNPC>()) {
-								if (!currentNPC) {
-									continue;
-								}
-
-								// ignore the player
-								// MQ101 Nate and Nora so that they don't become midgets
-								if (currentNPC->IsPlayer() ||                                                                       // exclude player
-									currentNPC->formID == 687412 || currentNPC->formID == 687413 ||                                 // MQ101 Nate and Nora so that they don't become midgets
-									currentNPC->formID == DLC01LvlCompWorkbenchBot || currentNPC->formID == DLC01CompWorkbenchBot)  // robot workbench bots
-								{
-									continue;
-								}
-
-								currentNPC->AddSpell(pluginData.spellForm);
-								++spellDistributionCount;
-							}
-
-							logger::warn("Distributed SCOURGE_SPEL to {} NPC records", spellDistributionCount);
+							DistributeSpell(dataHandler, "game data ready");
 						} else {
 							logger::warn("Unable to distribute SCOURGE_SPEL! The plugin will not work...");
 						}
